@@ -1,6 +1,6 @@
 cordova-plugin-epson-epos2-printer
 ====================
-Cordova plugin for Epson ePOS SDK(v2.6.0) for iOS and Android.
+Cordova plugin for Epson ePOS SDK(v2.24.0) for iOS and Android.
 
 Integrates the Epson ePOS2 SDK for iOS and Android with a
 limited set of functions to discover and connect ePOS printers
