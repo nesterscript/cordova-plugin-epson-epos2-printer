@@ -1,27 +1,27 @@
 {
-  "name": "epsonepos2tmp20",
-  "version": "0.0.6",
-  "description": "",
-  "cordova": {
-    "id": "epsonepos2tmp20",
-    "platforms": [
-      "android",
-      "ios"
-    ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MarkChu/cordova-plugin-epson-epos2-tm-p20.git"
-  },
-  "keywords": [
-    "ecosystem:cordova",
-    "cordova-android",
-    "cordova-ios"
-  ],
-  "author": "markchu929",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/MarkChu/cordova-plugin-epson-epos2-tm-p20/issues"
-  },
-  "homepage": "https://github.com/MarkChu/cordova-plugin-epson-epos2-tm-p20#readme"
+	"name": "cordova-plugin-epson-epos2-printer",
+	"version": "0.7.0",
+	"description": "",
+	"cordova": {
+		"id": "cordova-plugin-epson-epos2-printer",
+		"platforms": [
+			"android",
+			"ios"
+		]
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nesterscript/cordova-plugin-epson-epos2-printer.git"
+	},
+	"keywords": [
+		"ecosystem:cordova",
+		"cordova-android",
+		"cordova-ios"
+	],
+	"author": "Sergii Nesterovskyi",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/nesterscript/cordova-plugin-epson-epos2-printer/issues"
+	},
+	"homepage": "https://github.com/nesterscript/cordova-plugin-epson-epos2-printer#readme"
 }
