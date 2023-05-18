@@ -172,6 +172,11 @@ static NSDictionary *levelMap;
     }
 }
 
+- (void) onConnection:(id)deviceObj eventType:(int)eventType
+{
+	NSLog(@"[epos2] onConnection: %@ (%d)", deviceObj, eventType);
+}
+
 - (void) onDiscovery:(Epos2DeviceInfo *)deviceInfo
 {
     NSLog(@"[epos2] onDiscovery: %@ (%@)", [deviceInfo getTarget], [deviceInfo getDeviceName]);
@@ -365,86 +370,21 @@ static NSDictionary *levelMap;
     }
 }
 
-- (void)printText:(CDVInvokedUrlCommand *)command
-{
-    // (re-)connect printer with stored information
-    if (![self _connectPrinter]) {
-        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
-        return;
-    }
-    
-    NSString *printCallbackId = command.callbackId;
-    NSArray *printData = [command.arguments objectAtIndex:0];
-    int textFont = EPOS2_PARAM_DEFAULT;
-    int textSize = EPOS2_PARAM_DEFAULT;
-    int textAlign = EPOS2_PARAM_DEFAULT;
-    
-    // read optional arguments
-    if ([command.arguments count] > 1) {
-        textFont = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
-    }
-    if ([command.arguments count] > 2) {
-        textSize = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
-    }
-    if ([command.arguments count] > 3) {
-        textAlign = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
-    }
-    
-    [self.commandDelegate runInBackground:^{
-        int result = EPOS2_SUCCESS;
-        CDVPluginResult *cordovaResult;
-        
-        result = [self->printer addTextFont:textFont];
-
-        if (result == EPOS2_SUCCESS) {
-            result = [self->printer addTextLang:self->textLang];
-        }       
-
-        if (result == EPOS2_SUCCESS) {
-            result = [self->printer addTextSize:textSize height:textSize];
-        }
-        
-        if (result == EPOS2_SUCCESS) {
-            result = [self->printer addTextAlign:textAlign];
-        }
-        
-        if (result == EPOS2_SUCCESS) {
-            for (NSString *data in printData) {
-                if ([data isEqualToString:@"\n"]) {
-                    result = [self->printer addFeedLine:1];
-                } else {
-                    result = [self->printer addText:data];
-                }
-                
-                if (result != EPOS2_SUCCESS) {
-                    break;
-                }
-            }
-        }
-        
-        if (result == EPOS2_SUCCESS) {
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
-        } else {
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00030: Failed to add text data"];
-        }
-        
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
-    }];
-}
-
 - (void)printLine:(CDVInvokedUrlCommand *)command
 {
     // read command arguments
-    long startX = 0;
-    long endX = 100;
-    int lineStyle = 0;
-    
+    long x1 = 0;
+    long x2 = 100;
+    int style = 0;
+
+    if ([command.arguments count] > 0) {
+        x1 = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+    }
     if ([command.arguments count] > 1) {
-        endX = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+        x2 = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
     }
     if ([command.arguments count] > 2) {
-        lineStyle = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
+        style = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
     }
     
     // (re-)connect printer with stored information
@@ -460,191 +400,26 @@ static NSDictionary *levelMap;
         int result = EPOS2_SUCCESS;
         CDVPluginResult *cordovaResult;
         
-        result = [printer addPageBegin];
+        result = [self->printer addPageBegin];
         if (result == EPOS2_SUCCESS) {
-            result = [printer addPageArea:0 y:0 width:388 height:6];
+            result = [self->printer addPageArea:0 y:0 width:600 height:6];
         }
         if (result == EPOS2_SUCCESS) {
-            result = [printer addPageDirection:EPOS2_DIRECTION_LEFT_TO_RIGHT];
+            result = [self->printer addPageDirection:EPOS2_DIRECTION_LEFT_TO_RIGHT];
         }
         if (result == EPOS2_SUCCESS) {
-            result = [printer addPagePosition:0 y:0];
+            result = [self->printer addPagePosition:0 y:0];
         }
         if (result == EPOS2_SUCCESS) {
-            result = [printer addPageLine:startX y1:0 x2:endX y2:0 style:lineStyle];
+            result = [self->printer addPageLine:x1 y1:0 x2:x2 y2:0 style:style];
         }
         if (result == EPOS2_SUCCESS) {
-            result = [printer addPageEnd];
+            result = [self->printer addPageEnd];
         }
 
         if (result != EPOS2_SUCCESS) {
             NSLog(@"[epos2] Error in Epos2Printer.addHLine(): %d", result);
             cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add line data"];
-        } else {
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
-        }
-        
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
-    }];
-}
-
-- (void)printBarCode:(CDVInvokedUrlCommand *)command
-{
-    // read command arguments
-    NSString *data = [command.arguments objectAtIndex:0];
-    NSString *type = [command.arguments objectAtIndex:1];
-    NSNumber *bType = [barcodeTypeMap objectForKey:type];
-    int hriPosition = 0;
-    int hriFont = 0;
-    long bWidth = 2;
-    long bHeight = 70;    
-    
-    if ([command.arguments count] > 2) {
-        hriPosition = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
-    }
-    if ([command.arguments count] > 3) {
-        hriFont = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
-    }
-    if ([command.arguments count] > 4) {
-        bWidth = ((NSNumber *)[command.arguments objectAtIndex:4]).intValue;
-    }
-    if ([command.arguments count] > 5) {
-        bHeight = ((NSNumber *)[command.arguments objectAtIndex:5]).intValue;
-    }
-
-    // (re-)connect printer with stored information
-    if (![self _connectPrinter]) {
-        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
-        return;
-    }
-    
-    NSString *printCallbackId = command.callbackId;
-        
-    [self.commandDelegate runInBackground:^{
-        int result = EPOS2_SUCCESS;
-        CDVPluginResult *cordovaResult;
-        
-        result = [self->printer addBarcode:data
-                                type:bType.intValue
-                                hri:hriPosition
-                                font:hriFont
-                                width:bWidth
-                                height:bHeight];
-        if (result != EPOS2_SUCCESS) {
-            NSLog(@"[epos2] Error in Epos2Printer.addHLine(): %d", result);
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add barcode data"];
-        } else {
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
-        }
-        
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
-    }];
-}
-
-- (void)printImage:(CDVInvokedUrlCommand *)command
-{
-    // read command arguments
-    NSString *data = [command.arguments objectAtIndex:0];
-    int printMode = EPOS2_MODE_MONO;
-    int halfTone = EPOS2_HALFTONE_THRESHOLD;
-    
-    if ([command.arguments count] > 1) {
-        printMode = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
-    }
-    if ([command.arguments count] > 2) {
-        halfTone = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
-    }
-    
-    // (re-)connect printer with stored information
-    if (![self _connectPrinter]) {
-        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
-        return;
-    }
-    
-    NSString *printCallbackId = command.callbackId;
-    
-    // create UIImage from base64 data argument
-    //NSData *imageData = [[NSData alloc] initWithBase64EncodedString:data options:0];
-    
-    // create UIImage from (data) url
-    NSURL *url = [NSURL URLWithString:data];
-    NSData *imageData = [NSData dataWithContentsOfURL:url];
-    UIImage *image = [UIImage imageWithData:imageData];
-    
-    NSLog(@"[epos2] addImage with data: %dx%d pixels", (int)image.size.width, (int)image.size.height);
-    
-    [self.commandDelegate runInBackground:^{
-        int result = EPOS2_SUCCESS;
-        CDVPluginResult *cordovaResult;
-        
-        result = [printer addImage:image x:0 y:0
-                             width:image.size.width
-                            height:image.size.height
-                             color:EPOS2_COLOR_1
-                              mode:printMode
-                          halftone:halfTone
-                        brightness:EPOS2_PARAM_DEFAULT
-                          compress:EPOS2_COMPRESS_AUTO];
-        if (result != EPOS2_SUCCESS) {
-            NSLog(@"[epos2] Error in Epos2Printer.addImage(): %d", result);
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add image data"];
-        } else {
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
-        }
-        
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
-    }];
-}
-
-- (void)printSymbol:(CDVInvokedUrlCommand *)command
-{
-    // read command arguments
-    NSString *data = [command.arguments objectAtIndex:0];
-    NSString *type = [command.arguments objectAtIndex:1];
-    NSNumber *bType = [symbolMap objectForKey:type];
-    NSNumber *level = [NSNumber numberWithInt:EPOS2_PARAM_DEFAULT];
-    long width = 3;
-    long height = 3;
-    long size = 0;
-    
-    if ([command.arguments count] > 2) {
-        NSString *levelStr = ((NSString *)[command.arguments objectAtIndex:2]);
-        level = [levelMap objectForKey:levelStr];
-    }
-    if ([command.arguments count] > 3) {
-        width = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
-    }
-    if ([command.arguments count] > 4) {
-        height = ((NSNumber *)[command.arguments objectAtIndex:4]).intValue;
-    }
-    if ([command.arguments count] > 5) {
-        size = ((NSNumber *)[command.arguments objectAtIndex:5]).intValue;
-    }
-
-    // (re-)connect printer with stored information
-    if (![self _connectPrinter]) {
-        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
-        return;
-    }
-    
-    NSString *printCallbackId = command.callbackId;
-        
-    [self.commandDelegate runInBackground:^{
-        int result = EPOS2_SUCCESS;
-        CDVPluginResult *cordovaResult;
-        
-        result = [self->printer addSymbol:data
-                                type:bType.intValue
-                                level:level.intValue
-                                width:width
-                                height:height
-                                size:size];
-        if (result != EPOS2_SUCCESS) {
-            NSLog(@"[epos2] Error in Epos2Printer.printSymbol(): %d", result);
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add barcode data"];
         } else {
             cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
         }
@@ -676,27 +451,27 @@ static NSDictionary *levelMap;
         CDVPluginResult *cordovaResult;
         
         // feed paper
-        result = [printer addFeedLine:3];
+        result = [self->printer addFeedLine:3];
         if (result != EPOS2_SUCCESS) {
             NSLog(@"[epos2] Error in Epos2Printer.addFeedLine(): %d", result);
             return;
         }
         
         // send cut command
-        result = [printer addCut:EPOS2_CUT_FEED];
+        result = [self->printer addCut:EPOS2_CUT_FEED];
         if (result != EPOS2_SUCCESS) {
             NSLog(@"[epos2] Error in Epos2Printer.addCut(): %d", result);
             return;
         }
         
-        result = [printer sendData:EPOS2_PARAM_DEFAULT];
+        result = [self->printer sendData:EPOS2_PARAM_DEFAULT];
         if (result != EPOS2_SUCCESS) {
-            [printer disconnect];
+            [self->printer disconnect];
             [self finalizeObject];
             cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00051: Failed to send print job"];
-            [self.commandDelegate sendPluginResult:cordovaResult callbackId:sendDataCallbackId];
+            [self.commandDelegate sendPluginResult:cordovaResult callbackId:self->sendDataCallbackId];
         } else {
-            [printer clearCommandBuffer];
+            [self->printer clearCommandBuffer];
         }
       
         // do not yet trigger callback but wait for onPtrReceive
@@ -770,6 +545,587 @@ static NSDictionary *levelMap;
     } else {
         return -1;
     }
+}
+
+// ************************************************************************************************
+- (void) addFeedLine:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	int line = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	NSLog(@"[epos2] addFeedLine(%d)", line);
+	
+	result = [printer addFeedLine:line];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addFeedLine(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00030: Adding feed line failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+}
+
+- (void) addFeedPosition:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	int position = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	NSLog(@"[epos2] addFeedPosition(%d)", position);
+	
+	result = [printer addFeedPosition:position];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addFeedPosition(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00031: Adding feed position failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];	
+}
+
+- (void)addTextAlign:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	int align = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	NSLog(@"[epos2] addTextAlign(%d)", align);
+	
+	result = [printer addTextAlign:align];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addTextAlign(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00032: Adding text align failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];	
+}
+
+- (void)addTextFont:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	int font = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	NSLog(@"[epos2] addTextFont(%d)", font);
+	
+	result = [printer addTextFont:font];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addTextFont(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00033: Adding text font failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];	
+}
+
+- (void)addTextSize:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	int width = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	int height = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+	
+	NSLog(@"[epos2] addTextSize(%d, %d)", width, height);
+	
+	result = [printer addTextSize:width height:height];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addTextSize(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00033: Adding text size failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];	
+}
+
+- (void)addTextStyle:(CDVInvokedUrlCommand *)command
+{
+	// (re-)connect printer with stored information
+    if (![self _connectPrinter]) {
+        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+        return;
+    }
+	int reverse = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	int ul = EPOS2_PARAM_DEFAULT;
+	int em = EPOS2_PARAM_DEFAULT;
+	int color = EPOS2_PARAM_DEFAULT;
+
+	    // read optional arguments
+    if ([command.arguments count] > 1) {
+		ul = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+    }
+
+    if ([command.arguments count] > 2) {
+        em = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
+    }
+
+    if ([command.arguments count] > 3) {
+        color = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
+    }
+
+	int result = EPOS2_SUCCESS;
+	CDVPluginResult *cordovaResult = nil;
+	
+	result = [printer addTextStyle:reverse ul:ul em:em color:color];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addTextStyle(): %d", result);
+		cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00030: Adding text style failed"];
+	}
+	
+	// return OK result
+	if (cordovaResult == nil) {
+		cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	}
+	
+	if (command != nil) {
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+	}
+
+}
+
+- (void)addHLine:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+    long x1 = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	long x2 = 100;
+	int style = 0;
+	
+	if ([command.arguments count] > 1) {
+		x2 = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+	}
+	if ([command.arguments count] > 2) {
+		style = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
+	}
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addHLine:x1 x2:x2 style:style];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addHLine(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add line data"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addLineSpace:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+	long space = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addLineSpace:space];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addLineSpace(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add line space"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addText:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+	NSString *data = [command.arguments objectAtIndex:0];
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addText:data];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addText(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add text data"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addSymbol:(CDVInvokedUrlCommand *)command
+{
+    // read command arguments
+    NSString *data = [command.arguments objectAtIndex:0];
+    NSString *type = [command.arguments objectAtIndex:1];
+    NSNumber *bType = [symbolMap objectForKey:type];
+    NSNumber *level = [NSNumber numberWithInt:EPOS2_PARAM_DEFAULT];
+    long width = 3;
+    long height = 3;
+    long size = 0;
+    
+    if ([command.arguments count] > 2) {
+        NSString *levelStr = ((NSString *)[command.arguments objectAtIndex:2]);
+        level = [levelMap objectForKey:levelStr];
+    }
+    if ([command.arguments count] > 3) {
+        width = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
+    }
+    if ([command.arguments count] > 4) {
+        height = ((NSNumber *)[command.arguments objectAtIndex:4]).intValue;
+    }
+    if ([command.arguments count] > 5) {
+        size = ((NSNumber *)[command.arguments objectAtIndex:5]).intValue;
+    }
+
+    // (re-)connect printer with stored information
+    if (![self _connectPrinter]) {
+        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+        return;
+    }
+    
+    NSString *printCallbackId = command.callbackId;
+        
+    [self.commandDelegate runInBackground:^{
+        int result = EPOS2_SUCCESS;
+        CDVPluginResult *cordovaResult;
+        
+        result = [self->printer addSymbol:data
+                                type:bType.intValue
+                                level:level.intValue
+                                width:width
+                                height:height
+                                size:size];
+        if (result != EPOS2_SUCCESS) {
+            NSLog(@"[epos2] Error in Epos2Printer.addSymbol(): %d", result);
+            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add barcode data"];
+        } else {
+            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+        }
+        
+        [self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+    }];
+}
+
+- (void)addPageBegin:(CDVInvokedUrlCommand *)command
+{
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addPageBegin];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addPageBegin(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add page begin"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addPageEnd:(CDVInvokedUrlCommand *)command
+{
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addPageEnd];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addPageEnd(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add page end"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addPageArea:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+	long x = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	long y = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+	long width = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
+	long height = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addPageArea:x y:y width:width height:height];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addPageArea(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add page area"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addPageDirection:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+	int direction = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addPageDirection:direction];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addPageDirection(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add page direction"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addPagePosition:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+	long x = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	long y = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addPagePosition:x y:y];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addPagePosition(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add page position"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+- (void)addPageLine:(CDVInvokedUrlCommand *)command
+{
+	// read command arguments
+	long x1 = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	long y1 = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+	long x2 = 100;
+	long y2 = 100;
+	int style = 0;
+	
+	if ([command.arguments count] > 2) {
+		x2 = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
+	}
+	if ([command.arguments count] > 3) {
+		y2 = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
+	}
+	if ([command.arguments count] > 4) {
+		style = ((NSNumber *)[command.arguments objectAtIndex:4]).intValue;
+	}
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	NSString *printCallbackId = command.callbackId;
+		
+	[self.commandDelegate runInBackground:^{
+		int result = EPOS2_SUCCESS;
+		CDVPluginResult *cordovaResult;
+		
+        result = [self->printer addPageLine:x1 y1:y1 x2:x2 y2:y2 style:style];
+		
+		if (result != EPOS2_SUCCESS) {
+			NSLog(@"[epos2] Error in Epos2Printer.addPageLine(): %d", result);
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add line data"];
+		} else {
+			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		}
+		
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+	}];
+}
+
+//- (void)addPageRectangle:(CDVInvokedUrlCommand *)command
+//{
+//	// read command arguments
+//	long x = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+//	long y = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+//	long width = ((NSNumber *)[command.arguments objectAtIndex:2]).intValue;
+//	long height = ((NSNumber *)[command.arguments objectAtIndex:3]).intValue;
+//	int style = 0;
+//
+//	if ([command.arguments count] > 4) {
+//		style = ((NSNumber *)[command.arguments objectAtIndex:4]).intValue;
+//	}
+//
+//	// (re-)connect printer with stored information
+//	if (![self _connectPrinter]) {
+//		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+//		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+//		return;
+//	}
+//
+//	NSString *printCallbackId = command.callbackId;
+//
+//	[self.commandDelegate runInBackground:^{
+//		int result = EPOS2_SUCCESS;
+//		CDVPluginResult *cordovaResult;
+//
+//		result = [printer addPageRectangle:x y:y width:width height:height style:style];
+//
+//		if (result != EPOS2_SUCCESS) {
+//			NSLog(@"[epos2] Error in Epos2Printer.addPageRectangle(): %d", result);
+//			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00040: Failed to add page rectangle"];
+//		} else {
+//			cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+//		}
+//
+//		[self.commandDelegate sendPluginResult:cordovaResult callbackId:printCallbackId];
+//	}];
+//}
+
+- (void)addCut:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	int type = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	
+	NSLog(@"[epos2] addCut(%d)", type);
+	
+	result = [printer addCut:type];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addCut(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00032: Adding cut failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];	
+}
+
+- (void)addPulse:(CDVInvokedUrlCommand *)command
+{
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	int drawer = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
+	int time = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
+	
+	NSLog(@"[epos2] addPulse(%d, %d)", drawer, time);
+	
+	int result = [printer addPulse:drawer time:time];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.addPulse(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00014: Adding pulse failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+	[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
 }
 
 @end

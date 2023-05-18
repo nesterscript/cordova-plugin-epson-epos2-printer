@@ -12,58 +12,58 @@ var PLUGIN_NAME = "epos2";
  * @return {Promise}
  */
 function _exec(cmd, args, callbackArgs) {
-  var _successCallback, _errorCallback;
-  if (
-    callbackArgs.length > 1 &&
-    typeof callbackArgs[callbackArgs.length - 1] === "function"
-  ) {
-    _errorCallback = callbackArgs[callbackArgs.length - 1];
-  }
-  if (
-    callbackArgs.length > 0 &&
-    typeof callbackArgs[callbackArgs.length - 2] === "function"
-  ) {
-    _successCallback = callbackArgs[callbackArgs.length - 2];
-  }
+	var _successCallback, _errorCallback;
+	if (
+		callbackArgs.length > 1 &&
+		typeof callbackArgs[callbackArgs.length - 1] === "function"
+	) {
+		_errorCallback = callbackArgs[callbackArgs.length - 1];
+	}
+	if (
+		callbackArgs.length > 0 &&
+		typeof callbackArgs[callbackArgs.length - 2] === "function"
+	) {
+		_successCallback = callbackArgs[callbackArgs.length - 2];
+	}
 
-  return new Promise(function(resolve, reject) {
-    // call cordova/exec
-    exec(
-      function(result) {
-        if (_successCallback) {
-          _successCallback(result);
-        }
-        resolve(result);
-      },
-      function(err) {
-        if (_errorCallback) {
-          _errorCallback(err);
-        }
-        reject(new Error(err));
-      },
-      PLUGIN_NAME,
-      cmd,
-      args
-    );
-  });
+	return new Promise(function (resolve, reject) {
+		// call cordova/exec
+		exec(
+			function (result) {
+				if (_successCallback) {
+					_successCallback(result);
+				}
+				resolve(result);
+			},
+			function (err) {
+				if (_errorCallback) {
+					_errorCallback(err);
+				}
+				reject(new Error(err));
+			},
+			PLUGIN_NAME,
+			cmd,
+			args
+		);
+	});
 }
 
 function execDiscoverCommand(successCallback, errorCallback) {
-  exec(
-    function(result) {
-      if (typeof successCallback === "function") {
-        successCallback(result);
-      }
-    },
-    function(err) {
-      if (typeof errorCallback === "function") {
-        errorCallback(err);
-      }
-    },
-    PLUGIN_NAME,
-    "startDiscover",
-    []
-  );
+	exec(
+		function (result) {
+			if (typeof successCallback === "function") {
+				successCallback(result);
+			}
+		},
+		function (err) {
+			if (typeof errorCallback === "function") {
+				errorCallback(err);
+			}
+		},
+		PLUGIN_NAME,
+		"startDiscover",
+		[]
+	);
 }
 
 /**
@@ -72,346 +72,269 @@ function execDiscoverCommand(successCallback, errorCallback) {
  * This is the plugin interface exposed to cordova.epos2
  */
 var epos2 = {
-  /**
-   * Set language for printer
-   *
-   * @param {String} lang
-   * @param {String} textLang
-   * @return {Promise}
-   */
-   setLang: function(lang, textLang) {
-    var args = [];
-    if (lang && typeof lang === "string") {
-      args.push(lang);
-    }
-    if (textLang && typeof textLang === "string") {
-      args.push(textLang);
-    }
-    return _exec("setLang", args, arguments);
-  },
+	/**
+	 * Set language for printer
+	 *
+	 * @param {String} lang
+	 * @param {String} textLang
+	 * @return {Promise}
+	 */
+	setLang: function (lang, textLang) {
+		var args = [];
+		if (lang && typeof lang === "string") {
+			args.push(lang);
+		}
+		if (textLang && typeof textLang === "string") {
+			args.push(textLang);
+		}
+		return _exec("setLang", args, arguments);
+	},
 
-  /**
-   * Start device discovery
-   *
-   * This will trigger the successCallback function for every
-   * device detected to be available for printing. The device info
-   * is provided as single argument to the callback function.
-   *
-   * @param {Function} successCallback
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolves when the first device is detected or rejects if operation times out
-   */
-  startDiscover: function(successCallback, errorCallback) {
-    execDiscoverCommand(successCallback, errorCallback);
-  },
+	/**
+	 * Start device discovery
+	 *
+	 * This will trigger the successCallback function for every
+	 * device detected to be available for printing. The device info
+	 * is provided as single argument to the callback function.
+	 *
+	 * @param {Function} successCallback
+	 * @param {Function} [errorCallback]
+	 * @return {Promise} resolves when the first device is detected or rejects if operation times out
+	 */
+	startDiscover: function (successCallback, errorCallback) {
+		execDiscoverCommand(successCallback, errorCallback);
+	},
 
-  /**
-   * Stop running device discovery
-   *
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise}
-   */
-  stopDiscover: function(successCallback, errorCallback) {
-    return _exec("stopDiscover", [], arguments);
-  },
+	/**
+	 * Stop running device discovery
+	 *
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise}
+	 */
+	stopDiscover: function (successCallback, errorCallback) {
+		return _exec("stopDiscover", [], arguments);
+	},
 
-  /**
-   * Attempt to connect the given printing device
-   *
-   * Only if the promise resolves, the printer connection has been established
-   * and the plugin is ready to sent print commands. If connection fails, the
-   * promise rejects and printing is not possible.
-   *
-   * @param {Object|String} device Device information as retrieved from discovery
-   *          or string with device address ('BT:xx:xx:xx:xx:xx' or 'TCP:xx.xx.xx.xx')
-   * @param {String}   printerModel The printer series/model (e.g. 'TM-T88VI') as listed by `getSupportedModels()`
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise}
-   */
-  connectPrinter: function(device, printerModel) {
-    var args = [];
-    if (typeof device === "object" && device.target) {
-      args.push(device.target);
-    } else {
-      args.push(device);
-    }
-    if (printerModel && typeof printerModel === "string") {
-      args.push(printerModel);
-    }
-    return _exec("connectPrinter", args, arguments);
-  },
+	/**
+	 * Attempt to connect the given printing device
+	 *
+	 * Only if the promise resolves, the printer connection has been established
+	 * and the plugin is ready to sent print commands. If connection fails, the
+	 * promise rejects and printing is not possible.
+	 *
+	 * @param {Object|String} device Device information as retrieved from discovery
+	 *          or string with device address ('BT:xx:xx:xx:xx:xx' or 'TCP:xx.xx.xx.xx')
+	 * @param {String}   printerModel The printer series/model (e.g. 'TM-T88VI') as listed by `getSupportedModels()`
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise}
+	 */
+	connectPrinter: function (device, printerModel) {
+		var args = [];
+		if (typeof device === "object" && device.target) {
+			args.push(device.target);
+		} else {
+			args.push(device);
+		}
+		if (printerModel && typeof printerModel === "string") {
+			args.push(printerModel);
+		}
+		return _exec("connectPrinter", args, arguments);
+	},
 
-  /**
-   * Disconnect a previously connected printer
-   *
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise}
-   */
-  disconnectPrinter: function(successCallback, errorCallback) {
-    return _exec("disconnectPrinter", [], arguments);
-  },
+	/**
+	 * Disconnect a previously connected printer
+	 *
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise}
+	 */
+	disconnectPrinter: function (successCallback, errorCallback) {
+		return _exec("disconnectPrinter", [], arguments);
+	},
 
-  /**
-   * Send a print job to the connected printer
-   *
-   * This command is limited to print text and implicitly sends some additional
-   * line feeds an a "cut" command after the given text data to complete the job.
-   *
-   * @param {Array} data List of strings to be printed as text. Use '\n' to feed paper for one line.
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolving on success, rejecting on error
-   * @deprecated Use dedicated methods like `printText()` or `printImage()`
-   */
-  print: function(data, successCallback, errorCallback) {
-    return _exec("printText", [data, 0, 1, 0], [])
-      .then(function() {
-        return _exec("sendData", [], []);
-      })
-      .then(function(result) {
-        if (typeof successCallback === "function") {
-          successCallback(result);
-        }
-      })
-      .catch(function(err) {
-        if (typeof errorCallback === "function") {
-          errorCallback(err);
-        }
-        throw err;
-      });
-  },
+	/**
+	 * Send a print job to the connected printer
+	 *
+	 * This command is limited to print text and implicitly sends some additional
+	 * line feeds an a "cut" command after the given text data to complete the job.
+	 *
+	 * @param {Array} data List of strings to be printed as text. Use '\n' to feed paper for one line.
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise} resolving on success, rejecting on error
+	 * @deprecated Use dedicated methods like `printText()` or `printImage()`
+	 */
+	print: function (data, successCallback, errorCallback) {
+		return _exec("printText", [data, 0, 1, 0], [])
+			.then(function () {
+				return _exec("sendData", [], []);
+			})
+			.then(function (result) {
+				if (typeof successCallback === "function") {
+					successCallback(result);
+				}
+			})
+			.catch(function (err) {
+				if (typeof errorCallback === "function") {
+					errorCallback(err);
+				}
+				throw err;
+			});
+	},
 
-  /**
-   * Send text to the connected printer
-   *
-   * Can be called multiple times for additional text lines.
-   * Set `terminate` to True in order to complete the print job.
-   *
-   * @param {String|Array} data List of strings to be printed as text. Use '\n' to feed paper for one line.
-   * @param {Number} [textFont=0] Select font: 0 = Font A, 1 = Font B, 2 = Font C, 3 = Font D, 4 = Font E
-   * @param {Number} [textSize=1] Define text size (1..8)
-   * @param {Number} [textAlign=0] Define text alignment: 0 = left, 1 = center, 2 = right
-   * @param {Boolean} [terminate=false] Send additional line feeds an a "cut" command to complete the print
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolving on success, rejecting on error
-   */
-  printText: function(
-    data,
-    textFont,
-    textSize,
-    textAlign,
-    terminate,
-    successCallback,
-    errorCallback
-  ) {
-    // convert data argument to array
-    if (!Array.isArray(data)) {
-      data = [String(data)];
-    }
+	/**
+	 * Send Line data to the connected printer
+	 *
+	 * Set `terminate` to True in order to complete the print job.
+	 *
+	 * @param {Number} Specifies the start position to draw a horizontal ruled line (in dots). 0 to 65535 
+	 * @param {Number} Specifies the end position to draw a horizontal ruled line (in dots). 0 to 65535
+	 * @param {Number} Specifies the ruled line type.
+	 * @param {Boolean} [terminate=false] Send additional line feeds an a "cut" command to complete the print
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise} resolving on success, rejecting on error
+	 */
+	printLine: function (
+		startx,
+		endx,
+		linestyle,
+		terminate,
+		successCallback,
+		errorCallback
+	) {
+		return _exec("printLine", [startx || 0, endx || 100, linestyle || 0], arguments)
+			.then(function (result) {
+				return terminate ? _exec("sendData", [], []) : result;
+			})
+			.then(function (result) {
+				if (typeof successCallback === "function") {
+					successCallback(result);
+				}
+			})
+			.catch(function (err) {
+				if (typeof errorCallback === "function") {
+					errorCallback(err);
+				}
+				throw err;
+			});
+	},
 
-    return _exec(
-      "printText",
-      [data, textFont || 0, textSize || 1, textAlign || 0],
-      arguments
-    )
-      .then(function(result) {
-        return terminate ? _exec("sendData", [], []) : result;
-      })
-      .then(function(result) {
-        if (typeof successCallback === "function") {
-          successCallback(result);
-        }
-      })
-      .catch(function(err) {
-        if (typeof errorCallback === "function") {
-          errorCallback(err);
-        }
-        throw err;
-      });
-  },
+	/**
+	 * Get status information about the connected printer
+	 *
+	 * Status object will be returned as the single argument to the `successCallback` function if provided.
+	 *
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise} resolving with the printer status information
+	 */
+	getPrinterStatus: function (successCallback, errorCallback) {
+		return _exec("getPrinterStatus", [], arguments);
+	},
 
-  /**
-   * Send Line data to the connected printer
-   *
-   * Set `terminate` to True in order to complete the print job.
-   *
-   * @param {Number} Specifies the start position to draw a horizontal ruled line (in dots). 0 to 65535 
-   * @param {Number} Specifies the end position to draw a horizontal ruled line (in dots). 0 to 65535
-   * @param {Number} Specifies the ruled line type.
-   * @param {Boolean} [terminate=false] Send additional line feeds an a "cut" command to complete the print
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolving on success, rejecting on error
-   */
-  printLine: function(
-    startx,
-    endx,
-    linestyle,
-    terminate,
-    successCallback,
-    errorCallback
-  ) {
-    return _exec("printLine", [startx || 0, endx || 100, linestyle || 0], arguments)
-      .then(function(result) {
-        return terminate ? _exec("sendData", [], []) : result;
-      })
-      .then(function(result) {
-        if (typeof successCallback === "function") {
-          successCallback(result);
-        }
-      })
-      .catch(function(err) {
-        if (typeof errorCallback === "function") {
-          errorCallback(err);
-        }
-        throw err;
-      });
-  },
+	/**
+	 * List the device models supported by the driver
+	 *
+	 * Will be returned as the single argument to the `successCallback` function if provided.
+	 *
+	 * @param {Function} [successCallback]
+	 * @param {Function} [errorCallback]
+	 * @return {Promise} resolving with the list of model names
+	 */
+	getSupportedModels: function (successCallback, errorCallback) {
+		return _exec("getSupportedModels", [], arguments);
+	},
 
-   /**
-   * Send Barcode data to the connected printer
-   *
-   * Set `terminate` to True in order to complete the print job.
-   *
-   * @param {String} Barcode Data String 
-   * @param {String} Type Type of barcode
-   * @param {Number} Specifies the HRI position.(0 - 3) 0:No print 1:above 2:below 3:both
-   * @param {Number} Specifies the HRI font. (0 - 4) 
-   * @param {Number} Specifies the width of a single module in dots. (2-6)
-   * @param {Number} Specifies the height of the barcode in dots. (1 - 255)
-   * @param {Boolean} [terminate=false] Send additional line feeds an a "cut" command to complete the print
-   * @return {Promise} resolving on success, rejecting on error
-   */
-    printBarCode: function(
-      data,
-      type,
-      hriPosition,
-      hriFont,
-      Bwidth,
-      Bheight,
-      terminate,
-    ) {
-      var data = data;
-      return _exec("printBarCode", [data, type, hriPosition || 0, hriFont || 0 , Bwidth || 2, Bheight || 70], arguments)
-        .then(function(result) {
-          return terminate ? _exec("sendData", [], []) : result;
-        });
-    },
+	// *******************************************************************************************
 
-  /**
-   * Send Barcode128 data to the connected printer
-   *
-   * Set `terminate` to True in order to complete the print job.
-   *
-   * @param {String} Barcode Data String 
-   * @param {Number} Specifies the HRI position.(0 - 3) 0:No print 1:above 2:below 3:both
-   * @param {Number} Specifies the HRI font. (0 - 4) 
-   * @param {Number} Specifies the width of a single module in dots. (2-6)
-   * @param {Number} Specifies the height of the barcode in dots. (1 - 255)
-   * @param {Boolean} [terminate=false] Send additional line feeds an a "cut" command to complete the print
-   * @return {Promise} resolving on success, rejecting on error
-   */
-  printBarCode128: function(
-    data,
-    hriPosition,
-    hriFont,
-    Bwidth,
-    Bheight,
-    terminate,
-  ) {
-    var data = "{B" + data;
-    return this.printBarCode(data, "EPOS2_BARCODE_CODE128", hriPosition, hriFont, Bwidth, Bheight, terminate);
-  },
+	addTextAlign(align) {
+		return _exec("addTextAlign", [align || 0], arguments);
+	},
 
-  /**
-   * Send image data to the connected printer
-   *
-   * Set `terminate` to True in order to complete the print job.
-   *
-   * @param {String} data Image source as data-url (e.g. data:image/png;base64,xxxxx)
-   * @param {Number} [printMode=0] Specifies the color mode: 0 = Monochrome, 1 = Multi-gradation (16 scales), 2 = Monochrome, double density
-   * @param {Number} [halfTone=0] Halftone processing method: 0 = Dithering, 1 = Error diffusion, 2 = Threshold
-   * @param {Boolean} [terminate=false] Send additional line feeds an a "cut" command to complete the print
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolving on success, rejecting on error
-   */
-  printImage: function(
-    data,
-    printMode,
-    halfTone,
-    terminate,
-    successCallback,
-    errorCallback
-  ) {
-    return _exec("printImage", [data, printMode || 0, halfTone || 0], arguments)
-      .then(function(result) {
-        return terminate ? _exec("sendData", [], []) : result;
-      })
-      .then(function(result) {
-        if (typeof successCallback === "function") {
-          successCallback(result);
-        }
-      })
-      .catch(function(err) {
-        if (typeof errorCallback === "function") {
-          errorCallback(err);
-        }
-        throw err;
-      });
-  },
+	addLineSpace(space) {
+		return _exec("addLineSpace", [space || 0], arguments);
+	},
 
-   /**
-   * Send Barcode data to the connected printer
-   *
-   * Set `terminate` to True in order to complete the print job.
-   *
-   * @return {Promise} resolving on success, rejecting on error
-   */
-    printSymbol: function(
-      data,
-      type,
-      level,
-      width,
-      height,
-      size,
-      terminate
-    ) {
-      return _exec("printSymbol", [data , type || 0, level, width, height, size], arguments)
-        .then(function(result) {
-          return terminate ? _exec("sendData", [], []) : result;
-        })
-    },
+	addText(text) {
+		return _exec("addText", [text || ""], arguments);
+	},
 
-  /**
-   * Get status information about the connected printer
-   *
-   * Status object will be returned as the single argument to the `successCallback` function if provided.
-   *
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolving with the printer status information
-   */
-  getPrinterStatus: function(successCallback, errorCallback) {
-    return _exec("getPrinterStatus", [], arguments);
-  },
+	async addInvertedText(text) {
+		await this.addTextStyle(1);
+		await this.addText(text);
+		await this.addTextStyle(0);
+	},
 
-  /**
-   * List the device models supported by the driver
-   *
-   * Will be returned as the single argument to the `successCallback` function if provided.
-   *
-   * @param {Function} [successCallback]
-   * @param {Function} [errorCallback]
-   * @return {Promise} resolving with the list of model names
-   */
-  getSupportedModels: function(successCallback, errorCallback) {
-    return _exec("getSupportedModels", [], arguments);
-  }
+	addTextFont(font) {
+		return _exec("addTextFont", [font || 0], arguments);
+	},
+
+	addTextSize(width, height) {
+		return _exec("addTextSize", [width || 1, height || 1], arguments);
+	},
+
+	addTextStyle(reverse, ul, em, color) {
+		return _exec("addTextStyle", [reverse || 0, ul || 0, em || 0, color || 0], arguments);
+	},
+
+	addFeedLine(line) {
+		return _exec("addFeedLine", [line || 1], arguments);
+	},
+
+	addFeedPosition(position) {
+		return _exec("addFeedPosition", [position || 0], arguments);
+	},
+
+	addHLine(x1, x2, style) {
+		return _exec("addHLine", [x1 || 0, x2 || 100, style || 0], arguments);
+	},
+
+	addSymbol(symbol, type, level, width, height, size) {
+		return _exec("addSymbol", [symbol || "", type || 0, level || 0, width || 0, height || 0, size || 0], arguments);
+	},
+
+	addPageBegin() {
+		return _exec("addPageBegin", [], arguments);
+	},
+
+	addPageEnd() {
+		return _exec("addPageEnd", [], arguments);
+	},
+
+	addPageArea(x, y, width, height) {
+		return _exec("addPageArea", [x || 0, y || 0, width || 100, height || 100], arguments);
+	},
+
+	addPageDirection(direction) {
+		return _exec("addPageDirection", [direction || 0], arguments);
+	},
+
+	addPagePosition(x, y) {
+		return _exec("addPagePosition", [x || 0, y || 0], arguments);
+	},
+
+	addPageLine(x1, y1, x2, y2, style) {
+		return _exec("addPageLine", [x1 || 0, y1 || 0, x2 || 100, y2 || 100, style || 0], arguments);
+	},
+
+	addPageRectangle(x1, y1, x2, y2, style, width) {
+		return _exec("addPageRectangle", [x1 || 0, y1 || 0, x2 || 100, y2 || 100, style || 0, width || 0], arguments);
+	},
+
+	addCut(type) {
+		return _exec("addCut", [type || 0], arguments);
+	},
+
+	addPulse(drawer, time) {
+		return _exec("addPulse", [drawer || 0, time || 0], arguments);
+	},
+
+	sendData() {
+		return _exec("sendData", [], arguments);
+	}
 };
 
 module.exports = epos2;
