@@ -44,7 +44,10 @@ static NSDictionary *levelMap;
         @"TM-U220":   [NSNumber numberWithInt:EPOS2_TM_U220],
         @"TM-U330":   [NSNumber numberWithInt:EPOS2_TM_U330],
         @"TM-L90":    [NSNumber numberWithInt:EPOS2_TM_L90],
-        @"TM-H6000":  [NSNumber numberWithInt:EPOS2_TM_H6000]
+        @"TM-H6000":  [NSNumber numberWithInt:EPOS2_TM_H6000],
+		@"TM-T83III": [NSNumber numberWithInt:EPOS2_TM_T83III],
+		@"TM-T100":   [NSNumber numberWithInt:EPOS2_TM_T100],
+		@"TM-M30II":  [NSNumber numberWithInt:EPOS2_TM_M30II]
     };
     
     barcodeTypeMap = @{
@@ -553,8 +556,6 @@ static NSDictionary *levelMap;
 	int result = EPOS2_SUCCESS;
 	int line = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
 	
-	NSLog(@"[epos2] addFeedLine(%d)", line);
-	
 	result = [printer addFeedLine:line];
 	if (result != EPOS2_SUCCESS) {
 		NSLog(@"[epos2] Error in Epos2Printer.addFeedLine(): %d", result);
@@ -571,8 +572,6 @@ static NSDictionary *levelMap;
 {
 	int result = EPOS2_SUCCESS;
 	int position = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
-	
-	NSLog(@"[epos2] addFeedPosition(%d)", position);
 	
 	result = [printer addFeedPosition:position];
 	if (result != EPOS2_SUCCESS) {
@@ -591,8 +590,6 @@ static NSDictionary *levelMap;
 	int result = EPOS2_SUCCESS;
 	int align = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
 	
-	NSLog(@"[epos2] addTextAlign(%d)", align);
-	
 	result = [printer addTextAlign:align];
 	if (result != EPOS2_SUCCESS) {
 		NSLog(@"[epos2] Error in Epos2Printer.addTextAlign(): %d", result);
@@ -609,8 +606,6 @@ static NSDictionary *levelMap;
 {
 	int result = EPOS2_SUCCESS;
 	int font = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
-	
-	NSLog(@"[epos2] addTextFont(%d)", font);
 	
 	result = [printer addTextFont:font];
 	if (result != EPOS2_SUCCESS) {
@@ -629,8 +624,6 @@ static NSDictionary *levelMap;
 	int result = EPOS2_SUCCESS;
 	int width = ((NSNumber *)[command.arguments objectAtIndex:0]).intValue;
 	int height = ((NSNumber *)[command.arguments objectAtIndex:1]).intValue;
-	
-	NSLog(@"[epos2] addTextSize(%d, %d)", width, height);
 	
 	result = [printer addTextSize:width height:height];
 	if (result != EPOS2_SUCCESS) {
