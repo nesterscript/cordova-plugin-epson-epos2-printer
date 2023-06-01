@@ -155,36 +155,6 @@ var epos2 = {
 	},
 
 	/**
-	 * Send a print job to the connected printer
-	 *
-	 * This command is limited to print text and implicitly sends some additional
-	 * line feeds an a "cut" command after the given text data to complete the job.
-	 *
-	 * @param {Array} data List of strings to be printed as text. Use '\n' to feed paper for one line.
-	 * @param {Function} [successCallback]
-	 * @param {Function} [errorCallback]
-	 * @return {Promise} resolving on success, rejecting on error
-	 * @deprecated Use dedicated methods like `printText()` or `printImage()`
-	 */
-	print: function (data, successCallback, errorCallback) {
-		return _exec("printText", [data, 0, 1, 0], [])
-			.then(function () {
-				return _exec("sendData", [], []);
-			})
-			.then(function (result) {
-				if (typeof successCallback === "function") {
-					successCallback(result);
-				}
-			})
-			.catch(function (err) {
-				if (typeof errorCallback === "function") {
-					errorCallback(err);
-				}
-				throw err;
-			});
-	},
-
-	/**
 	 * Send Line data to the connected printer
 	 *
 	 * Set `terminate` to True in order to complete the print job.
@@ -262,12 +232,6 @@ var epos2 = {
 		return _exec("addText", [text || ""], arguments);
 	},
 
-	async addInvertedText(text) {
-		await this.addTextStyle(1);
-		await this.addText(text);
-		await this.addTextStyle(0);
-	},
-
 	addTextFont(font) {
 		return _exec("addTextFont", [font || 0], arguments);
 	},
@@ -334,7 +298,22 @@ var epos2 = {
 
 	sendData() {
 		return _exec("sendData", [], arguments);
-	}
+	},
+
+	clearCommandBuffer() {
+		return _exec("clearCommandBuffer", [], arguments);
+	},
+
+	async exSendData() {
+		await this.sendData();
+		return await this.clearCommandBuffer();
+	},
+
+	async exAddInvertedText(text) {
+		await this.addTextStyle(1);
+		await this.addText(text);
+		await this.addTextStyle(0);
+	},
 };
 
 module.exports = epos2;

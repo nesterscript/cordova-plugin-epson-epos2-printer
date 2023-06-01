@@ -433,52 +433,48 @@ static NSDictionary *levelMap;
 
 - (void)sendData:(CDVInvokedUrlCommand *)command
 {
-    sendDataCallbackId = command.callbackId;
-    
-    // check printer status (cached)
-    if (printerStatus == nil) {
-        printerStatus = [printer getStatus];
-    }
+	int result = EPOS2_SUCCESS;
 
-    if (![self isPrintable:printerStatus]) {
-        [printer clearCommandBuffer];
-        printerStatus = nil;
+	NSLog(@"[epos2] sendData()");
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	sendDataCallbackId = command.callbackId;
+	
+	// send data to printer
+	result = [printer sendData:EPOS2_PARAM_DEFAULT];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.sendData(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00050: Print job failed. Check the device."];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+	}
+}
 
-        CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00050: Printer is not ready. Check device and paper."];
-        [self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
-        return;
-    }
-    
-    [self.commandDelegate runInBackground:^{
-        int result = EPOS2_SUCCESS;
-        CDVPluginResult *cordovaResult;
-        
-        // feed paper
-        result = [self->printer addFeedLine:3];
-        if (result != EPOS2_SUCCESS) {
-            NSLog(@"[epos2] Error in Epos2Printer.addFeedLine(): %d", result);
-            return;
-        }
-        
-        // send cut command
-        result = [self->printer addCut:EPOS2_CUT_FEED];
-        if (result != EPOS2_SUCCESS) {
-            NSLog(@"[epos2] Error in Epos2Printer.addCut(): %d", result);
-            return;
-        }
-        
-        result = [self->printer sendData:EPOS2_PARAM_DEFAULT];
-        if (result != EPOS2_SUCCESS) {
-            [self->printer disconnect];
-            [self finalizeObject];
-            cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00051: Failed to send print job"];
-            [self.commandDelegate sendPluginResult:cordovaResult callbackId:self->sendDataCallbackId];
-        } else {
-            [self->printer clearCommandBuffer];
-        }
-      
-        // do not yet trigger callback but wait for onPtrReceive
-    }];
+-(void)clearCommandBuffer:(CDVInvokedUrlCommand *)command
+{
+	int result = EPOS2_SUCCESS;
+	
+	// (re-)connect printer with stored information
+	if (![self _connectPrinter]) {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00013: Printer is not connected"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+		return;
+	}
+	
+	result = [printer clearCommandBuffer];
+	if (result != EPOS2_SUCCESS) {
+		NSLog(@"[epos2] Error in Epos2Printer.clearCommandBuffer(): %d", result);
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00060: Clearing command buffer failed"];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+	} else {
+		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:YES];
+		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
+	}
 }
 
 - (void)getPrinterStatus:(CDVInvokedUrlCommand *)command
