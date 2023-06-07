@@ -453,6 +453,7 @@ static NSDictionary *levelMap;
 		CDVPluginResult *cordovaResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Error 0x00050: Print job failed. Check the device."];
 		[self.commandDelegate sendPluginResult:cordovaResult callbackId:command.callbackId];
 	}
+	// Don't run callback. Wait onPtrReceive
 }
 
 -(void)clearCommandBuffer:(CDVInvokedUrlCommand *)command
