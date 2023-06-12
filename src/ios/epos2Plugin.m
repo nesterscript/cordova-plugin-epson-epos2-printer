@@ -373,7 +373,7 @@ static NSDictionary *levelMap;
     }
 }
 
-- (void)printLine:(CDVInvokedUrlCommand *)command
+- (void)exAddLine:(CDVInvokedUrlCommand *)command
 {
     // read command arguments
     long x1 = 0;
@@ -405,7 +405,7 @@ static NSDictionary *levelMap;
         
         result = [self->printer addPageBegin];
         if (result == EPOS2_SUCCESS) {
-            result = [self->printer addPageArea:0 y:0 width:600 height:6];
+            result = [self->printer addPageArea:0 y:0 width:600 height:12];
         }
         if (result == EPOS2_SUCCESS) {
             result = [self->printer addPageDirection:EPOS2_DIRECTION_LEFT_TO_RIGHT];

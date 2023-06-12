@@ -21,7 +21,7 @@
 - (void)stopDiscover:(CDVInvokedUrlCommand *)command;
 - (void)connectPrinter:(CDVInvokedUrlCommand *)command;
 - (void)disconnectPrinter:(CDVInvokedUrlCommand *)command;
-- (void)printLine:(CDVInvokedUrlCommand *)command;
+- (void)exAddLine:(CDVInvokedUrlCommand *)command;
 - (void)sendData:(CDVInvokedUrlCommand *)command;
 
 - (void)addTextAlign:(CDVInvokedUrlCommand *)command;

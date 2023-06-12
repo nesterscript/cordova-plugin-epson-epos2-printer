@@ -167,7 +167,7 @@ var epos2 = {
 	 * @param {Function} [errorCallback]
 	 * @return {Promise} resolving on success, rejecting on error
 	 */
-	printLine: function (
+	exAddLine: function (
 		startx,
 		endx,
 		linestyle,
@@ -175,7 +175,7 @@ var epos2 = {
 		successCallback,
 		errorCallback
 	) {
-		return _exec("printLine", [startx || 0, endx || 100, linestyle || 0], arguments)
+		return _exec("exAddLine", [startx || 0, endx || 100, linestyle || 0], arguments)
 			.then(function (result) {
 				return terminate ? _exec("sendData", [], []) : result;
 			})
